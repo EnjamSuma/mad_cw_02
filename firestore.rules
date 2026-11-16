@@ -1,0 +1,26 @@
+
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Signed-in users can read today's challenge.
+    match /challenges/{challengeId} {
+      allow read: if request.auth != null;
+      allow write: if false;
+    }
+
+    // Users can read only their own progress.
+    // Rewards can only be written by the trusted backend.
+    match /users/{userId}/progress/{progressId} {
+      allow read: if request.auth != null
+                  && request.auth.uid == userId;
+      allow write: if false;
+    }
+
+    // Device records are not needed for this assignment.
+    match /users/{userId}/devices/{deviceId} {
+      allow read, write: if false;
+    }
+  }
+}
