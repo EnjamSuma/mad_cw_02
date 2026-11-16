@@ -3,13 +3,16 @@
 **Coursework:** CW-02 #03 – Firebase Cloud Services  
 **Student:** Suma Enjam  
 **Program:** M.S. Computer Science (Graduate)  
-**Institution:** Georgia State University
+**Institution:** Georgia State University  
+**GitHub:** https://github.com/EnjamSuma/mad_cw_02
 
 ## Project Overview
 
-Cloud Quest is a Flutter application that integrates Firebase Authentication, Cloud Firestore, Cloud Functions, and a Quest Coach. Users sign in, view a daily challenge, request a hint, and complete the challenge to earn 10 points and the First Quest badge.
+Cloud Quest is a Flutter application that integrates Firebase Authentication, Cloud Firestore, Cloud Functions, and a Quest Coach.
 
-The reward system is controlled by a trusted Cloud Function to prevent duplicate rewards and unauthorized modifications.
+Users can register, sign in, view a daily challenge, request hints, and complete the challenge to earn 10 points and the `first-quest` badge.
+
+Rewards are managed by a trusted Cloud Function to prevent duplicate rewards and unauthorized modifications.
 
 ## Technologies Used
 
@@ -35,25 +38,33 @@ npm install
 cd ..
 ```
 
-Start Firebase Emulators:
+Start the Firebase Emulators:
 
 ```bash
-firebase emulators:start --only auth,firestore,functions
+firebase emulators:start --project cloud-quest-cw2 --only auth,firestore,functions
 ```
 
-Run the Flutter application:
+For physical Android testing over USB, forward the emulator ports using ADB:
+
+```powershell
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:9099 tcp:9099
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:8080 tcp:8080
+& "$env:LOCALAPPDATA\Android\Sdk\platform-tools\adb.exe" reverse tcp:5001 tcp:5001
+```
+
+Run the application:
 
 ```bash
 flutter run
 ```
 
-For physical-device testing, the Firebase Emulators require a reachable network connection or USB port forwarding.
+The application connects to the local Firebase Emulators in debug mode. The Firestore Emulator must contain the `challenges/today` document with a title and prompt.
 
 ## Firebase Implementation
 
 ### Authentication
 
-Firebase Authentication supports account registration, sign-in, and sign-out. The application uses an authentication-state listener to protect the challenge screen.
+Firebase Authentication supports account registration, sign-in, and sign-out. An authentication-state listener ensures that only signed-in users can access the challenge screen.
 
 ### Cloud Firestore
 
@@ -62,33 +73,34 @@ The application uses two main document paths:
 - `challenges/today` – stores the daily challenge title and prompt.
 - `users/{uid}/progress/today` – stores completion status, points, badge, and timestamp.
 
-Firestore security rules prevent unauthorized reads and direct client modifications to reward records.
+Firestore security rules restrict access to authenticated users and prevent direct client modifications to reward records.
 
 ### Cloud Functions
 
 **completeToday**
 
-Validates the authenticated user and awards 10 points and the `first-quest` badge. A Firestore transaction ensures that completing the same challenge again does not award additional points.
+Validates the authenticated user and awards 10 points and the `first-quest` badge. A Firestore transaction prevents duplicate rewards when the same challenge is completed again.
 
 **askQuestCoach**
 
-Provides a hint based on the signed-in learner's challenge and progress. Its `readMyQuestState` tool retrieves only the current user's quest data.
+Provides a hint based on the authenticated learner's challenge and progress. The `readMyQuestState` tool reads the current learner's information without modifying Firestore.
 
 The current implementation uses an emulator-safe mock hint generator rather than a live Genkit model.
 
 ## Security and Trust Boundaries
 
-The Flutter client requests challenge information and completion, but it cannot directly modify reward records.
-
-The Cloud Function verifies the user's identity and controls reward updates.
-
-The Quest Coach reads the user's state without writing to Firestore or invoking the reward function. Its tool uses the verified authentication UID instead of accepting a user ID from the client.
+- The Flutter client cannot directly modify reward records.
+- Cloud Functions validate authenticated requests.
+- Firestore rules prevent users from accessing another learner's progress.
+- Reward updates are handled by the trusted backend.
+- Quest Coach uses the verified authentication UID rather than accepting a user ID from the client.
+- Quest Coach refuses requests to manipulate points, badges, or access another learner's data.
 
 ## Testing and Results
 
 ### Graduate Automated Tests
 
-Executed against the Firestore Emulator using:
+Firestore security rules were tested using:
 
 ```powershell
 $env:FIRESTORE_EMULATOR_HOST = "127.0.0.1:8080"
@@ -108,22 +120,31 @@ npm --prefix functions test
 
 ### Cloud Function Verification
 
-| Test | Observed result |
+| Test | Result |
 |---|---|
 | Unauthenticated reward request | HTTP 401 – UNAUTHENTICATED |
 | First authenticated completion | 10 points and `first-quest` badge |
-| Duplicate completion | `alreadyCompleted: true`; points remained 10 |
-| Quest Coach normal request | Recognized completed challenge |
-| Adversarial coach request | Refused to disclose another user's data or grant 500 points |
+| Duplicate completion | No additional points awarded |
+| Quest Coach normal request | Hint generated successfully |
+| Adversarial coach request | Unauthorized reward modification refused |
 
-### Known Limitations
+### Android Application Testing
 
-The physical Android app launched, but registration and sign-in encountered a Firebase Authentication network error. Backend functionality was therefore tested directly against the Firebase Emulators.
+The Flutter application was tested on a physical Android device connected to the Firebase Emulator Suite.
 
-The Quest Coach currently uses a deterministic mock response rather than a live AI model. Full mobile integration and live model verification remain incomplete.
+The following functionality was verified:
 
-## Conclusion
+- User registration and sign-in
+- Display of today's challenge
+- Successful Quest Coach hint generation
+- Challenge completion and reward display
+- Firestore storage of learner progress
 
-Cloud Quest demonstrates authenticated backend access, private learner progress, server-controlled rewards, duplicate-completion protection, and a read-only Quest Coach. Automated security tests and direct Cloud Function tests verified the backend behavior.
+Additional test cases include duplicate-completion protection, adversarial prompts, and simulated Quest Coach failure.
 
-The remaining work is to resolve the physical-device connection and verify the complete learner journey through the Flutter interface.
+Screenshots and supporting test evidence are stored in the `submission_evidence` directory.
+
+## Known Limitations
+
+- Quest Coach uses a deterministic mock hint generator rather than a live Genkit-powered AI model.
+- The application currently
